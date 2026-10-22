@@ -121,6 +121,21 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertIn('Maintenance', result[0].url)
 
+    def test_english_and_spanish_non_ac_queries_require_context(self):
+        root = main.BASE_URL + 'Mazda/2012/2/'
+        page = Selector(
+            '<a href="Accessories/Anti-Theft/Diagram/">Diagram</a>'
+            '<a href="Electrical/Wiring/Diagram/">Wiring Diagram</a>'
+            '<a href="Engine/Oil/Pressure%20Sensor/">Engine Oil Pressure Sensor</a>'
+            '<a href="Engine/Lubrication/Engine%20Oil/Specifications/">Engine Oil Specifications</a>'
+        )
+        result = main.buscar_secciones(page, root + 'index.html', root, 'diagrama electrico')
+        self.assertEqual(len(result), 1)
+        self.assertIn('Wiring', result[0].url)
+        result = main.buscar_secciones(page, root + 'index.html', root, 'tipo de aceite de motor')
+        self.assertEqual(len(result), 1)
+        self.assertIn('Specifications', result[0].url)
+
     def test_export_append_id_and_no_overwrite(self):
         link = main.Enlace('Capacity', main.BASE_URL + 'Hummer/2010/H3/Capacity/')
         with patch.object(main.Cliente, 'obtener', return_value=Selector('<p>Fixture only</p><img src="a.png">')):

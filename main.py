@@ -398,11 +398,35 @@ def cargar_indice(cliente: Cliente, indice: Enlace, raiz: str) -> Selector:
 def buscar_secciones(pagina: Selector, url: str, raiz: str, consulta: str) -> list[Enlace]:
     """Exige el tema principal; capacidad/especificaciones sólo refinan el tema."""
     consulta = normalizar(consulta)
+    alias = {
+        'electrico': 'electrical',
+        'electrica': 'electrical',
+        'electricos': 'electrical',
+        'electricas': 'electrical',
+        'diagrama': 'diagram',
+        'diagramas': 'diagram',
+        'ramal': 'wiring',
+        'ramales': 'wiring',
+        'cableado': 'wiring',
+        'freno': 'brake',
+        'frenos': 'brake',
+        'pinza': 'caliper',
+        'pastilla': 'pad',
+        'pastillas': 'pad',
+        'despiece': 'removal',
+        'desmontaje': 'removal',
+        'aceite': 'oil',
+        'motor': 'engine',
+        'tipo': 'type',
+        'cantidad': 'quantity',
+        'capacidad': 'capacity',
+    }
+    consulta = ' '.join(alias.get(palabra, palabra) for palabra in consulta.split())
     ac = bool(re.search(r"aire acondicionado|air conditioning|\ba/?c\b|refrigerant\b|r134|r1234|gas refrigerante|compresor|compressor", consulta))
     refrigerante = bool(re.search(r"refrigerante|coolant|anticongelante", consulta))
     aceite = bool(re.search(r"aceite|\boil\b|lubric", consulta))
-    capacidad = bool(re.search(r"cantidad|capacidad|cuanto|litros|capacity|capacities", consulta))
-    recomendado = bool(re.search(r"recomienda|recomendado|tipo|grado|viscosidad", consulta))
+    capacidad = bool(re.search(r"cantidad|capacidad|cuanto|litros|quantity|amount|capacity|capacities", consulta))
+    recomendado = bool(re.search(r"recomienda|recomendado|tipo|grado|viscosidad|type|grade|viscosity", consulta))
     codigos = re.findall(r"\b[pbcu][0-9a-f]{4}\b", consulta)
     if ac and not codigos:
         return buscar_ac(pagina, url, raiz, aceite=aceite)
@@ -431,7 +455,19 @@ def buscar_secciones(pagina: Selector, url: str, raiz: str, consulta: str) -> li
         else:
             sinonimos = {'fusible': 'fuse', 'rele': 'relay', 'apriete': 'torque'}
             terminos = {sinonimos.get(p, p) for p in palabras}
-            tema = any(re.search(r"\b" + re.escape(t) + r"\b", contenido) for t in terminos)
+            encontrados = {
+                termino for termino in terminos
+                if re.search(r"\b" + re.escape(termino) + r"\b", contenido)
+            }
+            tema = bool(encontrados)
+            if {'wiring', 'electrical'} & terminos or 'diagram' in terminos:
+                tema = bool(re.search(r"\belectrical\b|\bwiring\b|\bcircuit\b|\bconnector\b|\brelay\b|\bfuse\b", contenido))
+                tema = tema and bool({'wiring', 'electrical', 'diagram'} & encontrados)
+            if 'brake' in terminos:
+                tema = tema and bool(re.search(r"brake|caliper|rotor|pad|disc", contenido))
+            if 'oil' in terminos and 'engine' in terminos:
+                tema = tema and bool(re.search(r"engine oil|engine lubrication|oil capacity|oil type", contenido))
+                tema = tema and not bool(re.search(r"oil pressure sensor|oil control valve", contenido))
         if not tema:
             continue
         if (capacidad or recomendado) and re.search(r"fastener|tightening|connector|wiring|pressure sensor", contenido):
